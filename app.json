@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "OrbitMentor",
+    "slug": "orbitmentor",
+    "scheme": "orbitmentor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.orbitmentor.app"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.orbitmentor.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
