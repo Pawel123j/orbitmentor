@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import type { DailyQuest, QuizResult, UserProfile } from "../types";
-import { getLocalDateKey, isYesterday } from "../utils/date";
+import { getLocalDateKey, getNextStreak } from "../utils/date";
 
 const STORAGE_KEY = "orbitmentor-store";
 
@@ -45,18 +45,6 @@ const addUnique = (items: string[], value: string) =>
   items.includes(value) ? items : [...items, value];
 
 const removeItem = (items: string[], value: string) => items.filter((item) => item !== value);
-
-const getNextStreak = (previousDateKey: string | null, todayKey: string, currentStreak: number) => {
-  if (previousDateKey === todayKey) {
-    return currentStreak;
-  }
-
-  if (previousDateKey && isYesterday(previousDateKey, todayKey)) {
-    return currentStreak + 1;
-  }
-
-  return 1;
-};
 
 const initialProgress = {
   xp: 0,
