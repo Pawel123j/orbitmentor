@@ -1,0 +1,20 @@
+appId: com.orbitmentor.app.storagetest
+---
+# Install a build made with APP_VARIANT=storage-test first. This application ID
+# is intentionally different from the user's normal installation.
+- launchApp:
+    clearState: true
+- tapOn: "Start my roadmap"
+- openLink: "orbitmentor-storage-test://quests"
+- tapOn:
+    text: "Complete .*"
+    index: 0
+- assertVisible: "Quest completed"
+- stopApp
+- launchApp
+- openLink: "orbitmentor-storage-test://quests"
+- assertVisible: "Quest completed"
+- stopApp
+- launchApp
+- openLink: "orbitmentor-storage-test://quests"
+- assertVisible: "Quest completed"

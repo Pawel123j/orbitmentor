@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Check, Rocket, Sparkles } from "lucide-react-native";
 import { useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 import { AppCard } from "../src/components/AppCard";
@@ -31,7 +31,7 @@ export default function OnboardingScreen() {
   const {
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors }
   } = useForm<OnboardingForm>({
     resolver: zodResolver(onboardingSchema),
@@ -42,9 +42,9 @@ export default function OnboardingScreen() {
     }
   });
 
-  const selectedGoalId = watch("goalId");
-  const selectedLevel = watch("level");
-  const selectedDailyTime = watch("dailyTime");
+  const selectedGoalId = useWatch({ control, name: "goalId" });
+  const selectedLevel = useWatch({ control, name: "level" });
+  const selectedDailyTime = useWatch({ control, name: "dailyTime" });
   const selectedGoal = useMemo(() => getGoal(selectedGoalId), [selectedGoalId]);
 
   const onSubmit = (values: OnboardingForm) => {

@@ -16,3 +16,9 @@ web-build/
 *.log
 *-preview.png
 chrome-debug-profile/
+
+e2e/artifacts/
+e2e/__pycache__/
+.pytest_cache/
+
+.venv-e2e/

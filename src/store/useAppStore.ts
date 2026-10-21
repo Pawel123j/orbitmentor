@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import { z } from "zod";
 import type { DailyQuest, QuizResult, UserProfile } from "../types";
 import { getLocalDateKey, getNextStreak } from "../utils/date";
 
@@ -7,6 +8,7 @@ const STORAGE_KEY = "orbitmentor-store";
 
 type AppState = {
   hasHydrated: boolean;
+  storageError: string | null;
   onboardingCompleted: boolean;
   profile: UserProfile | null;
   xp: number;
@@ -41,6 +43,28 @@ type PersistedAppState = Pick<
   | "exploredPortfolioIdeas"
 >;
 
+const goalId = z.enum(["frontend", "backend", "mobile", "python", "cybersecurity", "data"]);
+const persistedSchema = z.object({
+  onboardingCompleted: z.boolean(),
+  profile: z.object({
+    goalId, level: z.enum(["beginner", "intermediate"]),
+    dailyTime: z.union([z.literal(15), z.literal(30), z.literal(60)]),
+    createdAt: z.string()
+  }).nullable(),
+  xp: z.number().int().nonnegative(),
+  streak: z.number().int().nonnegative(),
+  lastQuestCompletionDate: z.string().nullable(),
+  completedTasks: z.array(z.string()),
+  rewardedTaskIds: z.array(z.string()),
+  completedQuests: z.array(z.string()),
+  quizResults: z.array(z.object({
+    id: z.string(), goalId, score: z.number().int().nonnegative(),
+    total: z.number().int().positive(), xpEarned: z.number().int().nonnegative(),
+    completedAt: z.string()
+  })),
+  exploredPortfolioIdeas: z.array(z.string())
+}).refine((state) => !state.onboardingCompleted || state.profile !== null);
+
 const addUnique = (items: string[], value: string) =>
   items.includes(value) ? items : [...items, value];
 
@@ -72,6 +96,7 @@ const selectPersistedState = (state: AppState): PersistedAppState => ({
 
 export const useAppStore = create<AppState>((set, get) => ({
   hasHydrated: false,
+  storageError: null,
   onboardingCompleted: false,
   profile: null,
   ...initialProgress,
@@ -146,28 +171,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
 }));
 
-useAppStore.subscribe((state) => {
-  if (!state.hasHydrated) {
+let persistenceEnabled = false;
+let writes: Promise<void> = Promise.resolve();
+
+useAppStore.subscribe((state, previous) => {
+  if (!persistenceEnabled || !state.hasHydrated) {
     return;
   }
-
-  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(selectPersistedState(state)));
+  const snapshot = JSON.stringify(selectPersistedState(state));
+  if (snapshot === JSON.stringify(selectPersistedState(previous))) return;
+  // Ordered writes prevent a slower old snapshot replacing newer progress.
+  writes = writes.then(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, snapshot);
+      useAppStore.setState({ storageError: null });
+    } catch {
+      useAppStore.setState({ storageError: "Progress could not be saved. Keep this session open and try another action when storage is available." });
+    }
+  });
 });
 
 void (async () => {
   try {
     const storedState = await AsyncStorage.getItem(STORAGE_KEY);
 
-    if (storedState) {
-      useAppStore.setState({
-        ...(JSON.parse(storedState) as PersistedAppState),
-        hasHydrated: true
-      });
-      return;
-    }
-  } catch (error) {
-    console.warn("Unable to hydrate OrbitMentor progress", error);
+    const restored = storedState ? persistedSchema.parse(JSON.parse(storedState)) : {};
+    // Zod strips unknown keys: stored data cannot replace store actions.
+    useAppStore.setState({ ...restored, hasHydrated: true });
+    persistenceEnabled = true;
+  } catch {
+    // Keep the original stored bytes. In particular, do not write default
+    // progress after a read failure or corrupt payload.
+    useAppStore.setState({
+      hasHydrated: true,
+      storageError: "Saved progress could not be loaded. The stored copy is unchanged. Changes in this session will not be saved; restart the app to retry."
+    });
   }
-
-  useAppStore.setState({ hasHydrated: true });
 })();

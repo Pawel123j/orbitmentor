@@ -164,3 +164,47 @@ Progress can be reset from the Profile screen while keeping the selected onboard
 ## Licencja
 
 MIT — patrz [LICENSE](LICENSE).
+
+## Weryfikacja środowiska — 2026-10-17
+
+Lint, typy, 56 testów i eksport web przechodzą. Nowy test `e2e/` przechodzi onboarding, ukończenie zadania, quiz oraz odświeżenie z zachowaniem XP i historii. Sprawdzono widok o szerokości 390 px. CI buduje eksport Expo i uruchamia Chromium.
+
+Rekomendacje mentora i plan są lokalną logiką, nie usługą LLM. AsyncStorage zapisuje postęp lokalnie; brak synchronizacji kont i odzyskiwania danych po wyczyszczeniu pamięci. Android/iOS i dystrybucja sklepowa pozostają niezweryfikowane. Audyt npm nadal zgłasza zależności Expo/Jest, wymagające osobnej migracji zgodnego zestawu SDK.
+
+
+### Testy przeglądarkowe
+
+Po zainstalowaniu zależności aplikacji i zbudowaniu frontendu zgodnie z README / workflow `browser.yml` (lub jobem browser w `ci.yml`):
+
+```bash
+python -m venv .venv-e2e
+# Aktywuj ten venv przed dalszymi poleceniami.
+python -m pip install -r e2e/requirements.txt
+python -m playwright install chromium
+python -m pytest -q e2e
+```
+
+Na Linux może być potrzebne `python -m playwright install --with-deps chromium` z uprawnieniami administratora. Alternatywnie `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` wskazuje istniejący Chromium. Testy uruchamiają i zatrzymują własny serwer, używają nowego kontekstu przeglądarki i zapisują logi w ignorowanym `e2e/artifacts/`. Pełny backend musi mieć zainstalowane swoje zależności; `E2E_API_PYTHON` jest opcjonalnym wyborem jego interpretera w AutoDesk/BankGuard. Testy nie uruchamiają wdrożenia.
+
+## Walidacja etapu 2 — 2026-10-18
+
+Zapisany stan przechodzi walidację Zod i przywraca wyłącznie pola danych. Uszkodzona zawartość lub błąd odczytu nie nadpisuje magazynu wartościami domyślnymi; aplikacja pokazuje informację o problemie. Zapisy są szeregowane, dzięki czemu starszy zapis nie wygrywa wyścigu, a błąd zapisu nie staje się nieobsłużonym Promise rejection. Następna próba może odzyskać zapis.
+
+63 testy Jest, lint/typy, eksport web i 3 E2E PASS (pełna ścieżka, uszkodzony storage, quota przy zapisie). Nie potwierdzono natywnych Android/iOS ani usunięcia pozostałych podatności starego SDK; web nie zastępuje takiej walidacji.
+
+### Etap 3 — migracja SDK (2026-10-19)
+
+Expo 58.0.14, React Native 0.88.0 i React 19.3.0 są dobrane z oficjalnej macierzy
+SDK. Formularz onboardingu korzysta z `useWatch`, zgodnego z analizą React
+Compiler. Zachowano walidację uszkodzonego storage i kolejkę zapisów.
+
+Czyste `npm ci`, lint, typy, 63 testy Jest, eksport web oraz bundlowanie JS/Hermes
+dla Android/iOS przeszły lokalnie. Nie są to buildy APK/IPA ani testy urządzeń.
+[SECURITY_PATCH.md](SECURITY_PATCH.md) dokumentuje trzy poprawki zależności,
+regresje i bramkę z terminem 2026-11-18. Surowy audit: **21 high, 20 moderate,
+0 critical**; nie jest zerowy, a bezpośrednie advisories mają wskazane poprawki.
+
+[NATIVE_TESTS.md](NATIVE_TESTS.md) opisuje przygotowany test trwałości na urządzeniu
+w oddzielnej aplikacji testowej; ten przebieg nie został uruchomiony. Bieżące
+3 E2E web blokuje wadliwy właściciel pomocnika sandboxa Chromium w chmurze.
+Sandbox pozostaje włączony. Native release/urządzenia pozostają otwarte: PARTIAL.
