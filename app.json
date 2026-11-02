@@ -6,19 +6,30 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080F20"
+    },
     "plugins": [
       "expo-router",
       "expo-font"
     ],
     "android": {
-      "package": "com.orbitmentor.app"
+      "package": "com.orbitmentor.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080F20"
+      }
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.orbitmentor.app"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
     }
   }
 }

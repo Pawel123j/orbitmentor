@@ -44,7 +44,7 @@ type PersistedAppState = Pick<
 >;
 
 const goalId = z.enum(["frontend", "backend", "mobile", "python", "cybersecurity", "data"]);
-const persistedSchema = z.object({
+export const persistedSchema = z.object({
   onboardingCompleted: z.boolean(),
   profile: z.object({
     goalId, level: z.enum(["beginner", "intermediate"]),
@@ -178,8 +178,8 @@ useAppStore.subscribe((state, previous) => {
   if (!persistenceEnabled || !state.hasHydrated) {
     return;
   }
-  const snapshot = JSON.stringify(selectPersistedState(state));
-  if (snapshot === JSON.stringify(selectPersistedState(previous))) return;
+  const snapshot = encodeProgress(state);
+  if (snapshot === encodeProgress(previous)) return;
   // Ordered writes prevent a slower old snapshot replacing newer progress.
   writes = writes.then(async () => {
     try {
@@ -195,7 +195,7 @@ void (async () => {
   try {
     const storedState = await AsyncStorage.getItem(STORAGE_KEY);
 
-    const restored = storedState ? persistedSchema.parse(JSON.parse(storedState)) : {};
+    const restored = storedState ? decodeProgress(storedState) : {};
     // Zod strips unknown keys: stored data cannot replace store actions.
     useAppStore.setState({ ...restored, hasHydrated: true });
     persistenceEnabled = true;
@@ -208,3 +208,38 @@ void (async () => {
     });
   }
 })();
+
+
+/** Version 1 wraps the original unversioned payload without changing progress. */
+export function decodeProgress(raw: string): PersistedAppState {
+  if (raw.length > 2_000_000) throw new Error("Backup is too large (maximum 2 MB).");
+  const value: unknown = JSON.parse(raw);
+  if (typeof value !== "object" || value === null) throw new Error("Invalid backup.");
+  if ("version" in value || "app" in value) {
+    const envelope = z.object({ app: z.literal("orbitmentor"), version: z.literal(1), state: persistedSchema }).parse(value);
+    return envelope.state;
+  }
+  return persistedSchema.parse(value);
+}
+
+function encodeProgress(state: AppState): string {
+  return JSON.stringify({ app: "orbitmentor", version: 1, state: selectPersistedState(state) });
+}
+
+export function exportProgress(): string {
+  return encodeProgress(useAppStore.getState());
+}
+
+/** Parse before writing. Commit storage before replacing the visible progress. */
+export async function importProgress(raw: string): Promise<void> {
+  const restored = decodeProgress(raw);
+  const snapshot = JSON.stringify({ app: "orbitmentor", version: 1, state: restored });
+  const operation = writes.then(async () => {
+    await AsyncStorage.setItem(STORAGE_KEY, snapshot);
+    persistenceEnabled = false;
+    useAppStore.setState({ ...restored, hasHydrated: true, storageError: null });
+    persistenceEnabled = true;
+  });
+  writes = operation.catch(() => undefined);
+  await operation;
+}

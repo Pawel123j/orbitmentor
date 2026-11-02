@@ -49,7 +49,7 @@ test("write failure is handled and a later action can save successfully", async 
   store.getState().toggleTaskCompletion("second");
   await settle();
   expect(store.getState().storageError).toBeNull();
-  expect(JSON.parse(mockSetItem.mock.calls.at(-1)[1]).completedTasks).toEqual(["first", "second"]);
+  expect(JSON.parse(mockSetItem.mock.calls.at(-1)[1]).state.completedTasks).toEqual(["first", "second"]);
 });
 
 test("rapid actions serialize writes so old snapshots cannot overwrite new progress", async () => {
@@ -63,5 +63,40 @@ test("rapid actions serialize writes so old snapshots cannot overwrite new progr
   finish!();
   await settle();
   expect(mockSetItem).toHaveBeenCalledTimes(2);
-  expect(JSON.parse(mockSetItem.mock.calls[1][1]).completedTasks).toEqual(["first", "second"]);
+  expect(JSON.parse(mockSetItem.mock.calls[1][1]).state.completedTasks).toEqual(["first", "second"]);
+});
+
+
+test("versioned backup round-trips progress into a clean installation", async () => {
+  const store = await load(null);
+  store.getState().toggleTaskCompletion("lesson-1");
+  await settle();
+  const api = await import("../src/store/useAppStore");
+  const backup = api.exportProgress();
+  expect(JSON.parse(backup).version).toBe(1);
+  store.getState().resetProgress();
+  await api.importProgress(backup);
+  expect(store.getState().completedTasks).toEqual(["lesson-1"]);
+  expect(store.getState().xp).toBe(15);
+  expect(JSON.parse(mockSetItem.mock.calls.at(-1)[1]).state.xp).toBe(15);
+});
+
+test("unsupported and malformed backups never replace current progress", async () => {
+  const store = await load(JSON.stringify({ ...empty, xp: 100 }));
+  const api = await import("../src/store/useAppStore");
+  for (const raw of ["{", JSON.stringify({ app: "orbitmentor", version: 9, state: empty }), JSON.stringify({ ...empty, xp: -5 })]) {
+    await expect(api.importProgress(raw)).rejects.toThrow();
+  }
+  expect(store.getState().xp).toBe(100);
+  expect(mockSetItem).not.toHaveBeenCalled();
+});
+
+test("failed restore leaves current memory and storage intact and can retry", async () => {
+  const store = await load(JSON.stringify({ ...empty, xp: 100 }));
+  const api = await import("../src/store/useAppStore");
+  mockSetItem.mockRejectedValueOnce(new Error("disk full"));
+  await expect(api.importProgress(JSON.stringify(empty))).rejects.toThrow("disk full");
+  expect(store.getState().xp).toBe(100);
+  await api.importProgress(JSON.stringify(empty));
+  expect(store.getState().xp).toBe(0);
 });
