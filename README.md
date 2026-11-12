@@ -11,6 +11,8 @@ OrbitMentor is an offline learning planner for aspiring developers. Choose a car
 
 Backup format v1 wraps the current progress in an `orbitmentor` envelope. Import accepts that version and the previous unversioned local payload. The app validates the entire payload before writing it; failed writes leave current progress visible. Backup JSON is readable and unencrypted, so store it privately. Progress stays on this device unless you export a copy.
 
+Restoring waits for earlier saves and temporarily locks progress actions across the app. A blocking progress message remains visible until the imported snapshot is saved and displayed. If saving fails, the existing progress stays visible and actions become available again. Regression tests delay storage writes and check import, competing actions, failed writes, retries and restart consistency.
+
 ## Run locally
 
 Use Node.js 22.13+ or 24.3+ and npm:
@@ -34,6 +36,8 @@ The app works offline with bundled learning content and needs no environment var
 npm run lint
 npm run typecheck
 npm test -- --runInBand
+npm run test:security
+npm run security:check
 npx expo export --platform web
 ```
 
@@ -48,6 +52,16 @@ python -m pytest -q e2e
 Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` if Chromium is already installed at a custom path. A browser test is not a native Android/iOS test.
 The suite keeps Chromium's sandbox enabled; on Linux, install the Playwright browser or configure the system Chromium sandbox correctly rather than disabling it.
 
+CI uses Node 24 and the GitHub Ubuntu runner's system Chrome with the browser
+sandbox enabled. The dependency gate fails on unmitigated advisories and verifies
+every installed copy of the local `braces`, `sprintf-js` and `deepmerge` patches
+by version, file hashes and regression tests. These temporary patches require
+upstream review before 2026-11-18; a raw `npm audit` can still report their original
+versions. The old `node-forge` patch has been retired in favor of the fixed 1.4.3
+release, with its RSA validation regression retained. Expo CLI's actual dev-tools
+schemas are tested under the Zod override; web export, lint and tests also exercise
+the updated glob dependencies.
+
 ## Branding and screenshots
 
 App icon, Android adaptive icon, splash image and web favicon are configured in `app.json`. Screenshots in `docs/screenshots/` should come from the running app; label browser captures as web captures and do not present them as native device evidence.
@@ -60,9 +74,17 @@ Expo SDK 58.0.14, React Native 0.88.0, React 19.3.0, TypeScript, Expo Router, Zu
 
 There is no account or cloud sync. Clearing app storage removes local progress unless you exported a backup. The backup is plain JSON. Native installability, large-text behavior and screen-reader behavior still need device validation.
 
-## Validation in this workspace — 2026-11-02
+## Validation in this workspace — 2026-11-12
 
-Lint, TypeScript, all 66 Jest tests across 3 suites, and the static web export passed. The export includes `/backup`. Browser E2E could not start: this Linux environment's system `chrome-sandbox` helper is not owned by root. The suite keeps Chromium's sandbox enabled; no browser screenshots or native-device results were produced.
+Lint, TypeScript and all 69 Jest tests across 3 suites pass, including delayed
+restore, failed writes, concurrent actions and hydration. Security and dependency
+compatibility regressions pass. The static web export includes `/backup`; all four
+browser E2E scenarios pass against that export in system Chromium with its sandbox
+enabled. Local browser tests required execution outside the command sandbox,
+which otherwise blocks the HTTP server's socket. This does not establish native
+Android/iOS behavior or a passing remote CI run; check Actions on the final PR SHA.
+A clean installation in a separate directory also applied all three patches and
+passed the 69 Jest tests, security regressions, live dependency gate and web export.
 
 ## License
 

@@ -59,12 +59,9 @@ def application(name, command, cwd, url, env=None):
 @contextlib.contextmanager
 def browser():
     with sync_playwright() as p:
-        # GitHub-hosted runners restrict unprivileged namespaces: sandboxed
-        # Chromium exits before tests can start. Keep the browser sandbox on
-        # locally; CI runs the checked-out first-party static build in an
-        # isolated, ephemeral runner.
-        sandbox = os.environ.get('GITHUB_ACTIONS') != 'true'
-        instance = p.chromium.launch(executable_path=os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'), headless=True, chromium_sandbox=sandbox)
+        # CI selects the runner's system Chrome, whose AppArmor profile permits
+        # sandbox namespaces. Keep sandboxing enabled locally and on CI.
+        instance = p.chromium.launch(executable_path=os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH'), headless=True, chromium_sandbox=True)
         try:
             yield instance
         finally:

@@ -58,4 +58,38 @@ function sprintfChecks({ sprintf }) {
   assert.equal(sprintf('%65536s', 'x').length, 65536);
 }
 
-module.exports = { bracesChecks, forgeChecks, sprintfChecks };
+function deepmergeChecks(merge) {
+  const poisoned = () => JSON.parse('{"__proto__":{"isAdmin":true}}');
+  for (const [target, source] of [
+    [poisoned(), {}],
+    [Object.create(null), poisoned()],
+    [poisoned(), poisoned()],
+    [{ nested: poisoned() }, { nested: { label: 'safe' } }],
+  ]) {
+    const result = merge(target, source);
+    for (const object of [result, result.nested].filter(Boolean)) {
+      assert.equal(Object.getPrototypeOf(object), Object.prototype);
+      assert.equal(object.isAdmin, undefined, 'untrusted properties must not become inherited');
+      if (Object.hasOwn(object, '__proto__')) {
+        assert.deepEqual(Object.getOwnPropertyDescriptor(object, '__proto__'), {
+          value: { isAdmin: true }, enumerable: true, configurable: true, writable: true,
+        });
+      }
+    }
+  }
+  const symbol = Symbol('metadata');
+  const left = { nested: { a: 1 }, list: [{ x: 1 }], [symbol]: { a: 1 } };
+  const result = merge(left, { nested: { b: 2 }, list: [2], [symbol]: { b: 2 } });
+  assert.deepEqual(result, { nested: { a: 1, b: 2 }, list: [{ x: 1 }, 2], [symbol]: { a: 1, b: 2 } });
+  assert.notEqual(result.nested, left.nested);
+  assert.notEqual(result.list[0], left.list[0]);
+  assert.deepEqual(merge({ list: [1] }, { list: [2] }, { arrayMerge: (_, source) => source }), { list: [2] });
+  assert.deepEqual(merge({ count: 2 }, { count: 3 }, {
+    isMergeableObject: () => true,
+    customMerge: (key) => key === 'count' ? (a, b) => a + b : undefined,
+  }), { count: 5 });
+  assert.deepEqual(merge.all([{ a: 1 }, { b: 2 }]), { a: 1, b: 2 });
+  assert.equal({}.isAdmin, undefined);
+}
+
+module.exports = { bracesChecks, forgeChecks, sprintfChecks, deepmergeChecks };
