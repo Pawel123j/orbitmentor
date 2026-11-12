@@ -8,6 +8,7 @@ const STORAGE_KEY = "orbitmentor-store";
 
 type AppState = {
   hasHydrated: boolean;
+  isRestoring: boolean;
   storageError: string | null;
   onboardingCompleted: boolean;
   profile: UserProfile | null;
@@ -44,7 +45,7 @@ type PersistedAppState = Pick<
 >;
 
 const goalId = z.enum(["frontend", "backend", "mobile", "python", "cybersecurity", "data"]);
-const persistedSchema = z.object({
+export const persistedSchema = z.object({
   onboardingCompleted: z.boolean(),
   profile: z.object({
     goalId, level: z.enum(["beginner", "intermediate"]),
@@ -94,82 +95,93 @@ const selectPersistedState = (state: AppState): PersistedAppState => ({
   exploredPortfolioIdeas: state.exploredPortfolioIdeas
 });
 
-export const useAppStore = create<AppState>((set, get) => ({
-  hasHydrated: false,
-  storageError: null,
-  onboardingCompleted: false,
-  profile: null,
-  ...initialProgress,
-  setHasHydrated: (hasHydrated) => set({ hasHydrated }),
-  completeOnboarding: (profile) =>
-    set({
-      profile: {
-        ...profile,
-        createdAt: new Date().toISOString()
-      },
-      onboardingCompleted: true
-    }),
-  toggleTaskCompletion: (taskId, xpReward = 15) => {
-    const state = get();
-    const isCompleted = state.completedTasks.includes(taskId);
+export const useAppStore = create<AppState>((set, get) => {
+  // Import commits to storage before exposing its snapshot. No progress action
+  // may queue a snapshot of the old state while that transaction is in flight.
+  const updateProgress = (
+    update: Partial<PersistedAppState> | ((state: AppState) => Partial<PersistedAppState>)
+  ) => {
+    if (!get().hasHydrated || get().isRestoring) return;
+    set(update);
+  };
+  return {
+    hasHydrated: false,
+    isRestoring: false,
+    storageError: null,
+    onboardingCompleted: false,
+    profile: null,
+    ...initialProgress,
+    setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+    completeOnboarding: (profile) =>
+      updateProgress({
+        profile: {
+          ...profile,
+          createdAt: new Date().toISOString()
+        },
+        onboardingCompleted: true
+      }),
+    toggleTaskCompletion: (taskId, xpReward = 15) => {
+      const state = get();
+      const isCompleted = state.completedTasks.includes(taskId);
 
-    if (isCompleted) {
-      set({
-        completedTasks: removeItem(state.completedTasks, taskId)
+      if (isCompleted) {
+        updateProgress({
+          completedTasks: removeItem(state.completedTasks, taskId)
+        });
+        return;
+      }
+
+      const alreadyRewarded = state.rewardedTaskIds.includes(taskId);
+
+      updateProgress({
+        completedTasks: addUnique(state.completedTasks, taskId),
+        rewardedTaskIds: addUnique(state.rewardedTaskIds, taskId),
+        xp: alreadyRewarded ? state.xp : state.xp + xpReward
       });
-      return;
-    }
+    },
+    completeQuest: (quest) => {
+      const state = get();
 
-    const alreadyRewarded = state.rewardedTaskIds.includes(taskId);
+      if (state.completedQuests.includes(quest.id)) {
+        return;
+      }
 
-    set({
-      completedTasks: addUnique(state.completedTasks, taskId),
-      rewardedTaskIds: addUnique(state.rewardedTaskIds, taskId),
-      xp: alreadyRewarded ? state.xp : state.xp + xpReward
-    });
-  },
-  completeQuest: (quest) => {
-    const state = get();
+      const todayKey = getLocalDateKey();
 
-    if (state.completedQuests.includes(quest.id)) {
-      return;
-    }
-
-    const todayKey = getLocalDateKey();
-
-    set({
-      completedQuests: addUnique(state.completedQuests, quest.id),
-      completedTasks: addUnique(state.completedTasks, quest.taskId),
-      rewardedTaskIds: addUnique(state.rewardedTaskIds, quest.taskId),
-      xp: state.xp + quest.xp,
-      streak: getNextStreak(state.lastQuestCompletionDate, todayKey, state.streak),
-      lastQuestCompletionDate: todayKey
-    });
-  },
-  recordQuizResult: (result) =>
-    set((state) => ({
-      quizResults: [
-        ...state.quizResults,
-        {
-          ...result,
-          id: `${result.goalId}-${Date.now()}`,
-          completedAt: new Date().toISOString()
-        }
-      ],
-      xp: state.xp + result.xpEarned
-    })),
-  markPortfolioExplored: (ideaId) =>
-    set((state) => ({
-      exploredPortfolioIdeas: addUnique(state.exploredPortfolioIdeas, ideaId)
-    })),
-  resetProgress: () => set({ ...initialProgress }),
-  resetApp: () =>
-    set({
-      onboardingCompleted: false,
-      profile: null,
-      ...initialProgress
-    })
-}));
+      updateProgress({
+        completedQuests: addUnique(state.completedQuests, quest.id),
+        completedTasks: addUnique(state.completedTasks, quest.taskId),
+        rewardedTaskIds: addUnique(state.rewardedTaskIds, quest.taskId),
+        xp: state.xp + quest.xp,
+        streak: getNextStreak(state.lastQuestCompletionDate, todayKey, state.streak),
+        lastQuestCompletionDate: todayKey
+      });
+    },
+    recordQuizResult: (result) =>
+      updateProgress((state) => ({
+        quizResults: [
+          ...state.quizResults,
+          {
+            ...result,
+            id: `${result.goalId}-${Date.now()}`,
+            completedAt: new Date().toISOString()
+          }
+        ],
+        xp: state.xp + result.xpEarned
+      })),
+    markPortfolioExplored: (ideaId) =>
+      updateProgress((state) => ({
+        exploredPortfolioIdeas: addUnique(state.exploredPortfolioIdeas, ideaId)
+      })),
+    resetProgress: () => updateProgress({ ...initialProgress }),
+    resetApp: () =>
+      updateProgress({
+        onboardingCompleted: false,
+        profile: null,
+        ...initialProgress
+      })
+  };
+});
 
 let persistenceEnabled = false;
 let writes: Promise<void> = Promise.resolve();
@@ -178,8 +190,8 @@ useAppStore.subscribe((state, previous) => {
   if (!persistenceEnabled || !state.hasHydrated) {
     return;
   }
-  const snapshot = JSON.stringify(selectPersistedState(state));
-  if (snapshot === JSON.stringify(selectPersistedState(previous))) return;
+  const snapshot = encodeProgress(state);
+  if (snapshot === encodeProgress(previous)) return;
   // Ordered writes prevent a slower old snapshot replacing newer progress.
   writes = writes.then(async () => {
     try {
@@ -195,7 +207,7 @@ void (async () => {
   try {
     const storedState = await AsyncStorage.getItem(STORAGE_KEY);
 
-    const restored = storedState ? persistedSchema.parse(JSON.parse(storedState)) : {};
+    const restored = storedState ? decodeProgress(storedState) : {};
     // Zod strips unknown keys: stored data cannot replace store actions.
     useAppStore.setState({ ...restored, hasHydrated: true });
     persistenceEnabled = true;
@@ -208,3 +220,46 @@ void (async () => {
     });
   }
 })();
+
+
+/** Version 1 wraps the original unversioned payload without changing progress. */
+export function decodeProgress(raw: string): PersistedAppState {
+  if (raw.length > 2_000_000) throw new Error("Backup is too large (maximum 2 MB).");
+  const value: unknown = JSON.parse(raw);
+  if (typeof value !== "object" || value === null) throw new Error("Invalid backup.");
+  if ("version" in value || "app" in value) {
+    const envelope = z.object({ app: z.literal("orbitmentor"), version: z.literal(1), state: persistedSchema }).parse(value);
+    return envelope.state;
+  }
+  return persistedSchema.parse(value);
+}
+
+function encodeProgress(state: AppState): string {
+  return JSON.stringify({ app: "orbitmentor", version: 1, state: selectPersistedState(state) });
+}
+
+export function exportProgress(): string {
+  return encodeProgress(useAppStore.getState());
+}
+
+/** Parse before writing. Commit storage before replacing the visible progress. */
+export async function importProgress(raw: string): Promise<void> {
+  if (!useAppStore.getState().hasHydrated) throw new Error("Progress is still loading.");
+  if (useAppStore.getState().isRestoring) throw new Error("A restore is already in progress.");
+  const restored = decodeProgress(raw);
+  const snapshot = JSON.stringify({ app: "orbitmentor", version: 1, state: restored });
+  // Acquire synchronously, including while previous ordinary writes finish.
+  useAppStore.setState({ isRestoring: true });
+  const operation = writes.then(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, snapshot);
+      persistenceEnabled = false;
+      useAppStore.setState({ ...restored, hasHydrated: true, storageError: null });
+      persistenceEnabled = true;
+    } finally {
+      useAppStore.setState({ isRestoring: false });
+    }
+  });
+  writes = operation.catch(() => undefined);
+  await operation;
+}
