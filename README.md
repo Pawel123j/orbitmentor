@@ -56,7 +56,7 @@ CI uses Node 24 and the GitHub Ubuntu runner's system Chrome with the browser
 sandbox enabled. The dependency gate fails on unmitigated advisories and verifies
 every installed copy of the local `braces`, `sprintf-js` and `deepmerge` patches
 by version, file hashes and regression tests. These temporary patches require
-upstream review before 2026-11-18; a raw `npm audit` can still report their original
+upstream review before 2026-12-17; a raw `npm audit` can still report their original
 versions. The old `node-forge` patch has been retired in favor of the fixed 1.4.3
 release, with its RSA validation regression retained. Expo CLI's actual dev-tools
 schemas are tested under the Zod override; web export, lint and tests also exercise

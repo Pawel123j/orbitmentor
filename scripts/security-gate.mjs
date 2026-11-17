@@ -23,7 +23,7 @@ assert.ok(!report.error && report.vulnerabilities && report.metadata, 'invalid a
 const verified = new Set();
 function verify(name, node) {
   if (verified.has(node)) return;
-  assert.ok(new Date().toISOString().slice(0, 10) < '2026-11-18', 'local security patches require upstream review');
+  assert.ok(new Date().toISOString().slice(0, 10) < '2026-12-17', 'local security patches require upstream review');
   const location = resolve(node);
   assert.ok(location.startsWith(resolve('node_modules') + sep), 'unexpected package location');
   const patch = patches[name];

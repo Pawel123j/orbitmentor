@@ -14,7 +14,7 @@
     "test:watch": "jest --watch",
     "postinstall": "patch-package --error-on-fail",
     "security:check": "node scripts/security-gate.mjs",
-    "test:security": "node --test tests/security.test.cjs"
+    "test:security": "node --test tests/security.test.cjs tests/security-gate.test.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
