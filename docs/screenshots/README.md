@@ -1,38 +1,16 @@
-# Zrzuty ekranu
+# Screenshots
 
-Ten katalog jest pusty celowo.
+This folder has no product screenshots yet. The Expo web export builds, but this environment cannot launch Chromium with the required sandbox: its `chrome-sandbox` helper lacks root ownership and mode `4755`. There is also no Android or iOS simulator/device available here. I have not generated placeholder images.
 
-OrbitMentor to aplikacja natywna (Expo / React Native) — żeby zrobić zrzut,
-trzeba ją uruchomić na emulatorze albo telefonie. Środowisko, w którym
-przygotowywano to repozytorium, nie ma ani jednego, ani drugiego.
+When a browser or simulator with its security sandbox configured is available, capture the real app at a mobile viewport and add:
 
-Wizualizacja zamiast prawdziwego zrzutu byłaby gorsza niż brak obrazka:
-czytelnik nie miałby jak odróżnić jednego od drugiego.
+| File | Screen |
+| --- | --- |
+| `onboarding.png` | career path and daily study-time choices |
+| `dashboard.png` | current roadmap, XP and streak |
+| `roadmap.png` | modules and lesson progress |
+| `quests.png` | daily tasks |
+| `quiz.png` | quiz question and result |
+| `profile.png` | progress and backup action |
 
-## Jak je zrobić
-
-Aplikacja działa w całości offline na danych wbudowanych — nie trzeba
-konfigurować niczego:
-
-```bash
-npm install
-npx expo start
-```
-
-Potem `i` (symulator iOS), `a` (emulator Androida) albo kod QR w Expo Go.
-
-Zrzut: na iOS Cmd+S w symulatorze, na Androidzie przycisk aparatu
-w emulatorze.
-
-## Co warto pokazać
-
-| Plik | Ekran |
-|---|---|
-| `onboarding.png` | wybór celu, poziomu i czasu dziennego |
-| `dashboard.png` | pulpit z XP, rangą i serią |
-| `quests.png` | zadania dnia |
-| `roadmap.png` | moduły ścieżki z postępem |
-| `quiz.png` | pytanie quizowe |
-| `portfolio.png` | pomysły na projekty do portfolio |
-
-Potem podlinkuj je w README.
+Label browser captures as web. Do not describe them as Android or iOS device captures.

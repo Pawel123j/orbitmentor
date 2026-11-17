@@ -31,6 +31,9 @@ jobs:
       - name: Testy
         run: npm test
 
+      - name: Regresje bezpieczeństwa i zgodności zależności
+        run: npm run test:security
+
       - name: Audyt zależności
         # Aktualny audit jest obowiązkowy również po migracji SDK.
         run: npm run security:check
