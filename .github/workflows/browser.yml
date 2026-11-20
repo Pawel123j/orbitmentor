@@ -19,8 +19,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r e2e/requirements.txt
-      - run: python -m playwright install --with-deps chromium
+      # Systemowy Chrome z runnera ma działający sandbox (AppArmor na Ubuntu 24.04
+      # blokuje nieuprzywilejowane user namespaces dla pobranego chrome-headless-shell).
+      # Sandbox zostaje włączony (chromium_sandbox=True w e2e/browser_support.py).
+      - run: /usr/bin/google-chrome --version
       - run: python -m pytest -q e2e
+        env:
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
