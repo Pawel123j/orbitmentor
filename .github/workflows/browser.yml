@@ -31,6 +31,10 @@ jobs:
       # blokuje nieuprzywilejowane user namespaces dla pobranego chrome-headless-shell).
       # Sandbox zostaje włączony (chromium_sandbox=True w e2e/browser_support.py).
       - run: /usr/bin/google-chrome --version
+      # Ubuntu runners restrict unprivileged user namespaces through AppArmor,
+      # which the Chromium sandbox needs; allow them instead of --no-sandbox.
+      - name: Allow Chromium sandbox (user namespaces)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: python -m pytest -q e2e
         env:
           PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome
