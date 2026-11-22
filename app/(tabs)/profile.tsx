@@ -153,6 +153,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.actions}>
+        <GradientButton label="Backup and restore" onPress={() => router.push("/backup")} variant="primary" />
         <GradientButton
           label={`Explore ${projectCount} project ideas`}
           onPress={() => router.push("/portfolio")}
